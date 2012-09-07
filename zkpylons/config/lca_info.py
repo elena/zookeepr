@@ -31,6 +31,7 @@ lca_info = {
   'event_byline': 'linux.conf.au 2013 | 28 Jan - 1 Feb | Come Join the Party',
   'event_pricing_disclaimer': 'All prices are in Australian dollars and include 10% GST.',
   'event_trademark_notice': 'Linux is a registered trademark of Linus Torvalds',
+  'event_airport_code': 'CBR',
   'date' : datetime(2013, 1, 28, 9, 0, 00),
   'media_license_name' : 'Creative Commons Attribution-Share Alike License',
   'media_license_url'  : 'http://creativecommons.org/licenses/by-sa/3.0/',
@@ -47,7 +48,7 @@ lca_info = {
   'funding_status' : 'not_open',
   'funding_editing' : 'not_open',
   'conference_status': 'not_open',
-  'account_creation': False,
+  'account_creation': True,
 # Mode
   'cfp_hide_assistance_info': 'no',
   'cfp_hide_assistance_options': 'no',
@@ -182,15 +183,20 @@ lca_rego = {
 lca_menu = [
  ('Home', '/', 'home'),
  ('About', '/about/linux.conf.au', 'about'),
+ ('Sponsor', '/sponsor/sponsors', 'sponsor'),
+ ('Register', '/register', 'register'),
  ('Call for Proposals', '/cfp', 'cfp'),
  ('Call for Miniconfs', '/miniconf-cfp', 'miniconf-cfp'),
  ('FAQ', '/faq', 'faq'),
- ('Conditions of Registration', '/cor/terms_and_conditions', 'cor'),
+## ('Conditions of Registration', '/cor/terms_and_conditions', 'cor'),
  ('Contact', '/contact', 'contact'),
  ('Blog', '/blog', 'blog'),
+
+
 ]
 
 lca_submenus = {
  'about': ['linux.conf.au', 'Venues', 'Transport', '2013 Team'],
- 'cor': ['Terms and Conditions', 'Code Of Conduct'],
+ 'register': [ 'Terms and Conditions', 'Code Of Conduct'],
+ 'sponsor': ['Sponsors', 'Why Sponsor'],
 }

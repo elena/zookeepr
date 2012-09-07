@@ -20,7 +20,9 @@ from zkpylons.lib.mail import email
 
 from zkpylons.model import meta
 from zkpylons.model import Person, PasswordResetConfirmation, Role
+from zkpylons.model import ProposalStatus
 from zkpylons.model import SocialNetwork
+from zkpylons.model import Travel
 
 from zkpylons.config.lca_info import lca_info, lca_rego
 
@@ -150,6 +152,16 @@ class PersonaLoginSchema(BaseSchema):
 class RoleSchema(BaseSchema):
     role = validators.String(not_empty=True)
     action = validators.OneOf(['Grant', 'Revoke'])
+
+class TravelSchema(BaseSchema):
+    origin_airport = validators.String(not_empty=True)
+    destination_airport = validators.String(not_empty=True)
+    pre_validators = [NestedVariables]
+
+class OfferSchema(BaseSchema):
+    status = validators.OneOf(['accept', 'withdraw', 'contact'])
+    travel = TravelSchema(if_missing=None)
+    pre_validators = [NestedVariables]
 
 class PersonController(BaseController): #Read, Update, List
     @enforce_ssl(required_all=True)
@@ -531,3 +543,69 @@ class PersonController(BaseController): #Read, Update, List
         meta.Session.commit()
 
         return render('person/roles.mako')
+
+    @dispatch_on(POST="_offer")
+    @authorize(h.auth.is_valid_user)
+    def offer(self, id):
+        # We need to recheck auth in here so we can pass in the id
+        if not h.auth.authorized(h.auth.Or(h.auth.is_same_zkpylons_user(id), h.auth.has_reviewer_role, h.auth.has_organiser_role)):
+            # Raise a no_auth error
+            h.auth.no_role()
+        c.person = Person.find_by_id(id)
+        c.offers = c.person.proposal_offers
+        c.travel_assistance = reduce(lambda a, b: a or ('Travel' in b.status.name), c.offers, False) or False 
+        c.accommodation_assistance = reduce(lambda a, b: a or ('Accommodation' in b.status.name), c.offers, False) or False 
+
+        # Set initial form defaults
+        defaults = {
+            'status': 'accept',
+            }
+        if c.person.travel:
+            defaults.update(h.object_to_defaults(c.person.travel, 'travel'))
+
+        form = render('person/offer.mako')
+        return htmlfill.render(form, defaults)
+
+    @authorize(h.auth.is_valid_user)
+    @validate(schema=OfferSchema, form='offer', post_only=True, on_get=True, variable_decode=True)
+    def _offer(self,id):
+        # We need to recheck auth in here so we can pass in the id
+        if not h.auth.authorized(h.auth.Or(h.auth.is_same_zkpylons_user(id), h.auth.has_reviewer_role, h.auth.has_organiser_role)):
+            # Raise a no_auth error
+            h.auth.no_role()
+        c.person = Person.find_by_id(id)
+        c.offers = c.person.proposal_offers
+        c.travel_assistance = reduce(lambda a, b: a or ('Travel' in b.status.name), c.offers, False) or False 
+        c.accommodation_assistance = reduce(lambda a, b: a or ('Accommodation' in b.status.name), c.offers, False) or False 
+
+        # What status are we moving all proposals to?
+        if self.form_result['status'] == 'accept':
+            c.status = ProposalStatus.find_by_name('Accepted')
+        elif self.form_result['status'] == 'withdraw':
+            c.status = ProposalStatus.find_by_name('Withdrawn')
+        elif self.form_result['status'] == 'contact':
+            c.status = ProposalStatus.find_by_name('Contact')
+        else:
+            c.status = None
+
+        for offer in c.person.proposal_offers:
+            offer.status = c.status
+
+        if c.travel_assistance:
+            if not c.person.travel:
+                self.form_result['travel']['flight_details'] = ''
+                travel = Travel(**self.form_result['travel'])
+                meta.Session.add(travel)
+                c.person.travel = travel
+            else:
+                for key in self.form_result['travel']:
+                    setattr(c.person.travel, key, self.form_result['travel'][key])
+
+        if c.status.name == 'Accepted':
+            email(c.person.email_address, render('/person/offer_email.mako'))
+        else:
+            email([c.person.email_address, h.lca_info['emails']['presentation']], render('/person/offer_email.mako'))
+
+        # update the objects with the validated form data
+        meta.Session.commit()
+        return render('person/offer.mako')
