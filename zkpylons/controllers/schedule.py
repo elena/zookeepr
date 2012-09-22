@@ -1,11 +1,10 @@
 import logging
 import vobject
-import json
 
 from pylons import request, response, session, tmpl_context as c
 from zkpylons.lib.helpers import redirect_to
 from pylons.controllers.util import abort
-from pylons.decorators import validate
+from pylons.decorators import validate, jsonify
 from pylons.decorators.rest import dispatch_on
 
 import formencode
@@ -70,13 +69,8 @@ class ScheduleController(BaseController):
         else:
             c.can_edit = False
 
-        c.subsubmenu = []
-        c.subsubmenu.append([ '/programme/sunday', 'Sunday' ])
         c.scheduled_dates = TimeSlot.find_scheduled_dates()
-        for scheduled_date in c.scheduled_dates:
-            c.subsubmenu.append(['/programme/schedule/' + scheduled_date.strftime('%A').lower(), scheduled_date.strftime('%A')])
-
-        c.subsubmenu.append([ '/programme/saturday', 'Saturday' ])
+        c.subsubmenu = [['/programme/schedule/' + scheduled_date.strftime('%A').lower(), scheduled_date.strftime('%A')] for scheduled_date in c.scheduled_dates]
 
     def table(self, day=None):
         # Check if we have any schedule information to display and tell people if we don't
@@ -93,7 +87,7 @@ class ScheduleController(BaseController):
             if date.today() in c.scheduled_dates:
                 c.display_date = date.today()
             else:
-                c.display_date = c.scheduled_dates[0]
+                c.display_date = c.scheduled_dates[2]
 
         # Work out which times we should be displaying on the left hand time scale
         c.time_slots = TimeSlot.find_by_date(c.display_date)
@@ -178,6 +172,7 @@ class ScheduleController(BaseController):
         response.headers.add('Cache-Control', 'max-age=3600,public')
         return ical.serialize()
 
+    @jsonify
     def json(self):
         schedules = Schedule.find_all()
         output = []
@@ -202,12 +197,9 @@ class ScheduleController(BaseController):
                     row['URL'] = h.url_for(qualified=True, controller='schedule', action='view_talk', id=schedule.event.proposal_id)
                 output.append(row)
 
-        response.charset = 'utf8'
-        response.headers['content-type'] = 'application/json; charset=utf8'
-        response.headers.add('content-transfer-encoding', 'binary')
         response.headers.add('Pragma', 'cache')
         response.headers.add('Cache-Control', 'max-age=3600,public')
-        return json.write(output)
+        return output
 
     @dispatch_on(POST="_new")
     @validate(schema=NewScheduleFormSchema(), on_get=True, post_only=False, variable_decode=True)

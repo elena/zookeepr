@@ -36,7 +36,7 @@
         <link rel="stylesheet" media="screen, projection" href="/screen.css" type="text/css" />
         <link rel="stylesheet" media="screen" href="/css/lightbox.css" type="text/css" />
         <link rel="stylesheet" media="print" href="/print.css" type="text/css" />
-        <script type="text/javascript" src="/jquery.min.js"></script>
+        <script type="text/javascript" src="/jquery-1.7.1.min.js"></script>
         <script type="text/javascript" src="/js/jquery.cross-slide.min.js"></script>
         <link href="/media/news/rss" rel="alternate" type="application/rss+xml" title="LCA2011 News">
 
@@ -59,11 +59,8 @@
                     sleep: 5,
                     fade: 1,
                     shuffle: 1
-                }, [
-%  for sponsor in h.lca_info['sponsors']['slideshow']:
-                    { src: '${ sponsor['src'] }', alt: '${ sponsor['name'] }' },
-%  endfor
-                ]);
+                }, ${ h.json.dumps(h.lca_info['sponsors']['slideshow']) |n }
+                );
             });
         </script>
 %endif
@@ -102,14 +99,15 @@
           <h3>Our Emperor Sponsors</h3>
           <ul>
 % for sponsor in h.lca_info['sponsors']['top']:
-            <li><a href="${ sponsor['url'] }"><img src="${ sponsor['src'] }" alt="${ sponsor['name'] }"></a></li>
+            <li>${ h.link_to(h.image(sponsor['src'], alt=sponsor['alt']), sponsor['href']) }</li>
 % endfor
           </ul>
 %endif
 %if len(h.lca_info['sponsors']['slideshow']):
           <h3>Other Sponsors</h3>
           <div id="sponsorsother" style="width: 200px; height:200px; margin:5px;">
-            <img src="${ h.lca_info['sponsors']['slideshow'][0]['src'] }" alt="${ h.lca_info['sponsors']['slideshow'][0]['name'] }">
+<% sponsor = h.random.choice(h.lca_info['sponsors']['slideshow']) %>
+            ${ h.link_to(h.image(sponsor['src'], alt=sponsor['alt']), sponsor['href']) }
           </div>
 %endif
         </div>

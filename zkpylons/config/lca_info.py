@@ -44,7 +44,7 @@ lca_info = {
 # Possible statuses not_open|open|closed
   'cfp_status' : 'closed',
   'cfmini_status' : 'closed',
-  'proposal_editing' : 'closed',
+  'proposal_editing' : 'open',
   'funding_status' : 'not_open',
   'funding_editing' : 'not_open',
   'conference_status': 'not_open',
@@ -64,12 +64,12 @@ lca_info = {
   },
   'sponsors': {
     'top': [
-#      {'name': 'lca2007', 'src': '/images/history/lca2007-logo.png', 'url': 'http://lca2007.linux.org.au/'},
-#      {'name': 'lca2006', 'src': '/images/history/lca2006-logo.png', 'url': 'http://lca2006.linux.org.au/'},
+#      {'alt': 'lca2007', 'src': '/images/history/lca2007-logo.png', 'href': 'http://lca2007.linux.org.au/'},
+#      {'alt': 'lca2006', 'src': '/images/history/lca2006-logo.png', 'href': 'http://lca2006.linux.org.au/'},
     ],
     'slideshow': [
-#      {'name': 'lca2008', 'src': '/images/history/lca2008-logo.png'},
-#      {'name': 'lca2009', 'src': '/images/history/lca2009-logo.png'},
+      {'alt': 'Anchor', 'src': '/images/sponsors/anchor-white-bg.png', 'href': 'http://www.anchor.com.au/'},
+      {'alt': 'Linux Magazine', 'src': '/images/sponsors/linux-magazine.png', 'href': 'http://www.linux-magazine.com/'},
     ],
   },
 
@@ -183,20 +183,23 @@ lca_rego = {
 lca_menu = [
  ('Home', '/', 'home'),
  ('About', '/about/linux.conf.au', 'about'),
+ ('Programme', '/programme/schedule', 'programme'),
+ ('Venue', '/venue/venues', 'venue'),
  ('Sponsor', '/sponsor/sponsors', 'sponsor'),
  ('Register', '/register', 'register'),
- ('Call for Proposals', '/cfp', 'cfp'),
- ('Call for Miniconfs', '/miniconf-cfp', 'miniconf-cfp'),
+# ('Call for Proposals', '/cfp', 'cfp'),
+# ('Call for Miniconfs', '/miniconf-cfp', 'miniconf-cfp'),
  ('FAQ', '/faq', 'faq'),
 ## ('Conditions of Registration', '/cor/terms_and_conditions', 'cor'),
  ('Contact', '/contact', 'contact'),
+ ('Wiki', '/wiki', 'wiki'),
  ('Blog', '/blog', 'blog'),
-
-
 ]
 
 lca_submenus = {
- 'about': ['linux.conf.au', 'Venues', 'Transport', '2013 Team'],
+ 'about': ['linux.conf.au', '2013 Team'],
+ 'venue': ['Venues','Conference','Accommodation','Social','Parking','Transport'],
+ 'programme': ['Sunday', 'Schedule', 'Saturday', 'Partners'],
  'register': [ 'Terms and Conditions', 'Code Of Conduct'],
  'sponsor': ['Sponsors', 'Why Sponsor'],
 }

@@ -12,6 +12,7 @@ from webhelpers.html.tags import *
 from webhelpers.text import *
 import webhelpers.constants
 from datetime import datetime
+import simplejson as json
 
 try:
     from webhelpers.pylonslib import secure_form
@@ -422,10 +423,13 @@ def zk_root():
     this allows completely relevant URL's """
     pass #TODO
 
+def integer_to_currency(number, unit='$', precision=2, divisor=100.0):
+    return number_to_currency(number / divisor, unit, precision)
+
 def number_to_currency(number, unit='$', precision=2):
     "Provide an Australian currency version of your number"
-    locale.setlocale(locale.LC_ALL, 'en_AU')
-    format_string = "%%.%dd" % precision
+    locale.setlocale(locale.LC_ALL, '')
+    format_string = "%%.%df" % precision
     return unit + locale.format(format_string, number, grouping=True)
 
 def number_to_percentage(number):
