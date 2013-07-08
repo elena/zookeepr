@@ -59,6 +59,7 @@ class Person(Base):
     # the lengths of the fields are chosen arbitrarily
     firstname = sa.Column(sa.types.Text)
     lastname = sa.Column(sa.types.Text)
+    fullname = sa.orm.column_property(firstname + " " + lastname)
     address1 = sa.Column(sa.types.Text)
     address2 = sa.Column(sa.types.Text)
     city = sa.Column(sa.types.Text)
@@ -128,14 +129,14 @@ class Person(Base):
     def is_professional(self):
         """We treat speakers, miniconf orgs, Little Blue sponsors and
            professionals as professionals."""
-        for invoice in self.invoices:
-            if invoice.is_paid and not invoice.is_void:
-                if self.is_speaker() or self.is_miniconf_org():
-                    return True
-                else:
-                    for item in invoice.items:
-                        if (item.description.find('Professional') > -1 or item.description.find('Little Blue') > -1):
-                            return True
+        if self.is_speaker() or self.is_miniconf_org():
+            return True
+        else:
+            for invoice in self.invoices:
+                if invoice.is_paid and not invoice.is_void:
+                        for item in invoice.items:
+                            if (item.description.find('Professional') > -1 or item.description.find('Little Blue') > -1):
+                                return True
         return False
 
     def is_speaker(self):
@@ -237,9 +238,6 @@ class Person(Base):
         for sn in SocialNetwork.find_all():
             if sn.name not in self.social_network:
                 self.social_network[sn.name] = ''
-
-    def fullname(self):
-        return "%s %s" % (self.firstname, self.lastname)
 
     def __repr__(self):
         return '<Person id="%s" email="%s">' % (self.id, self.email_address)

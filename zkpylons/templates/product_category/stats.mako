@@ -34,19 +34,20 @@
 
     <table>
       <thead>
-        <td colspan="11" align="left">
+        <td colspan="12" align="left">
     <b>Pie charts:</b> Show invoiced product counts (including overdue).
         </td>
       <tr>
-        <td colspan="11" align="center"><div id="sales${ simple_title }" style="width:600px;height:300px;"></div></td>
+        <td colspan="12" align="center"><div id="sales${ simple_title }" style="width:600px;height:300px;"></div></td>
       </tr>
       <tr>
-        <td colspan="11" align="left">
+        <td colspan="12" align="left">
     <b>Note:</b> Money totals are not necessarily accurate as vouchers are not taken into account. They are simply paid items times cost.
         </td>
       </tr>
       <tr>
         <th>Description</th>
+        <th>Display Order</th>
         <th>Active</th>
         <th>Available</th>
         <th>Cost</th>
@@ -78,6 +79,7 @@
 
       <tr class="${ h.cycle('odd', 'even') }">
         <td>${ h.link_to(product.description, url=h.url_for(controller='product', action='view', id=product.id)) }</td>
+        <td>${ product.display_order }</td>
         <td>${ h.yesno(product.active) |n }</td>
         <td>${ h.yesno(product.available()) |n }</td>
         <td>${ h.integer_to_currency(product.cost) | h }</td>
@@ -112,7 +114,7 @@
             sales_d1 += ']'
 %>
         <tr>
-            <td colspan="4" style="font-weight: bold; text-align: right;">Totals:</td>
+            <td colspan="5" style="font-weight: bold; text-align: right;">Totals:</td>
             <td>${ invoiced_total }</td>
             <td>${ valid_invoices_total }</td>
             <td>${ sold_total }</td>

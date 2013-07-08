@@ -24,6 +24,7 @@ from zkpylons.lib.mail import email
 
 from zkpylons.model import meta, Invoice, InvoiceItem, Registration, ProductCategory, Product, URLHash
 from zkpylons.model.payment import Payment
+from zkpylons.model.payment_received import PaymentReceived
 
 from zkpylons.config.lca_info import lca_info
 from zkpylons.config.zkpylons_config import file_paths
@@ -57,7 +58,7 @@ class InvoiceItemProductDescriptionValidator(validators.FancyValidator):
 class InvoiceItemValidator(BaseSchema):
     product = ProductValidator()
     qty = validators.Int() 
-    cost = validators.Int(min=0, max=2000000)
+    cost = validators.Int(min=-2000000, max=2000000)
     description = validators.String(not_empty=False)
     chained_validators = [InvoiceItemProductDescriptionValidator()]
 
@@ -87,18 +88,42 @@ class InvoiceController(BaseController):
         pass
 
     @authorize(h.auth.has_organiser_role)
-    @dispatch_on(POST="_new")
     def new(self):
-        try:
-            c.invoice_person = request.GET['person_id']
-        except:
-            c.invoice_person = ''
-
-        c.due_date = datetime.date.today().strftime("%d/%y/%Y")
-
         c.product_categories = ProductCategory.find_all()
-        c.item_count = 0;
         return render("/invoice/new.mako")
+
+    def save_new_invoice(self):
+        """
+        """
+        import json
+        debug = ""
+        data = request.params['invoice']
+        data = json.loads(data)
+
+        person_id = int(data['person_id'],10)
+        due_date = datetime.datetime.strptime(data['due_date'], '%d/%m/%Y')
+
+        invoice = Invoice(person_id=person_id, due_date=due_date, manual=True, void=None)
+        for invoice_item in data['invoice_items']:
+            item = InvoiceItem()
+
+            if invoice_item.has_key('description') and invoice_item['description']:
+                item.description = invoice_item['description']
+            else:
+                product = Product.find_by_id(invoice_item['product_id'])
+                category = product.category
+                item.product = product
+                item.description = product.category.name + ' - ' + product.description
+
+            item.cost = float(invoice_item['cost'])
+            item.qty = int(invoice_item['qty'],10)
+            invoice.items.append(item)
+
+        meta.Session.add(invoice)
+        meta.Session.commit()
+
+        debug += str(invoice.id)
+        return debug
 
     @validate(schema=NewInvoiceSchema(), form='new', post_only=True, on_get=True, variable_decode=True)
     def _new(self):
@@ -191,9 +216,7 @@ class InvoiceController(BaseController):
     @authorize(h.auth.has_organiser_role)
     @dispatch_on(POST="_remind")
     def remind(self):
-        c.invoice_collection = Invoice.find_all()
-        #c.invoice = c.invoice_collection[0]
-        #c.recipient = c.invoice.person
+        c.invoice_collection = meta.Session.query(Invoice).filter(Invoice.is_paid==False).filter(Invoice.is_void==False).all()
         # create dummy person for example:
         c.recipient = FakePerson()
         return render('/invoice/remind.mako')
@@ -260,6 +283,46 @@ class InvoiceController(BaseController):
         meta.Session.commit()
         return render("/invoice/payment.mako")
 
+    def pay_invoice(self):
+        """
+        Pay an invoice via the new angular.js interface
+
+        Expects: and invoice_id. Assumes total amount is to be paid.
+
+        TODO: Validation??
+        """
+        invoice_id = int(request.params['invoice'],10)
+        invoice = Invoice.find_by_id(invoice_id, True)
+        person = invoice.person
+
+        if not h.auth.authorized(h.auth.Or(h.auth.is_same_zkpylons_user(person.id), h.auth.has_organiser_role, h.auth.has_unique_key())):
+            # Raise a no_auth error
+            h.auth.no_role()
+
+        payment = Payment()
+        payment.amount = invoice.total
+        payment.invoice = invoice
+
+        payment_received = PaymentReceived(
+                                    approved=True,
+                                    payment=payment,
+                                    invoice_id=invoice.id,
+                                    success_code='0',
+                                    amount_paid=payment.amount,
+                                    currency_used='AUD',
+                                    response_text='Approved',
+                                    client_ip_zookeepr='127.1.0.1',
+                                    client_ip_gateway='127.0.0.1',
+                                    email_address=person.email_address,
+                                    gateway_ref='Rego Desk Cash'
+                    )
+
+        meta.Session.add(payment)
+        meta.Session.add(payment_received)
+        meta.Session.commit()
+
+        return "Payment recorded"
+
     @validate(schema=PayInvoiceSchema(), form='pay', post_only=True, on_get=True, variable_decode=True)
     def _pay(self, id):
         payment = Payment.find_by_id(self.form_result['payment_id'])
@@ -294,6 +357,35 @@ class InvoiceController(BaseController):
             return render("/payment/gateway_error.mako")
         else:
             redirect(uri)
+
+    @authorize(h.auth.has_organiser_role)
+    @dispatch_on(POST="_new")
+    def refund(self, id):
+        invoice = Invoice.find_by_id(id)
+        try:
+            c.invoice_person = invoice.person.id
+        except:
+            c.invoice_person = ''
+
+        c.due_date = datetime.date.today().strftime("%d/%m/%Y")
+
+        c.product_categories = ProductCategory.find_all()
+        # The form adds one to the count by default, so we need to decrement it
+        c.item_count = len(invoice.items) - 1
+
+        defaults = dict()
+        defaults['invoice.person' ] = c.invoice_person
+        defaults['invoice.due_date'] = c.due_date
+        for i in range(len(invoice.items)):
+            item = invoice.items[i]
+            if item.product:
+                defaults['invoice.items-' + str(i) + '.product'] = item.product.id
+            else:
+                defaults['invoice.items-' + str(i) + '.description'] = item.description
+            defaults['invoice.items-' + str(i) + '.qty'] = -item.qty
+            defaults['invoice.items-' + str(i) + '.cost'] = item.cost
+        form = render("/invoice/new.mako")
+        return htmlfill.render(form, defaults, use_all_keys=True)
 
     @authorize(h.auth.has_organiser_role)
     @dispatch_on(POST="_pay_manual")
@@ -339,16 +431,18 @@ class InvoiceController(BaseController):
         if c.invoice.is_void:
             h.flash("Invoice was already voided.")
             return redirect_to(action='view', id=c.invoice.id)
-
-        if h.auth.authorized(h.auth.has_organiser_role):
+        elif len(c.invoice.payment_received) and h.auth.authorized(h.auth.has_organiser_role):
+            h.flash("Invoice has a payment applied to it, do you want to " + h.link_to('Refund', h.url_for(action='refund')) + " instead?")
+            return redirect_to(action='view', id=c.invoice.id)
+        elif len(c.invoice.payment_received):
+            h.flash("Cannot void a paid invoice.")
+            return redirect_to(action='view', id=c.invoice.id)
+        elif h.auth.authorized(h.auth.has_organiser_role):
             c.invoice.void = "Administration Change"
             meta.Session.commit()
             h.flash("Invoice was voided.")
             return redirect_to(action='view', id=c.invoice.id)
         else:
-            if c.invoice.is_paid:
-                h.flash("Cannot void a paid invoice.")
-                return redirect_to(action='view', id=c.invoice.id)
             c.invoice.void = "User cancellation"
             c.person = c.invoice.person
             meta.Session.commit()
@@ -364,3 +458,13 @@ class InvoiceController(BaseController):
         meta.Session.commit()
         h.flash("Invoice was un-voided.")
         return redirect_to(action='view', id=c.invoice.id)
+
+    @authorize(h.auth.has_organiser_role)
+    def extend(self, id):
+        c.invoice = Invoice.find_by_id(id, True)
+        if c.invoice.is_overdue:
+            c.invoice.due_date = datetime.datetime.now() + datetime.timedelta(days=1)
+        else:
+            c.invoice.due_date = c.invoice.due_date + ((c.invoice.due_date - datetime.datetime.now()) * 2)
+        meta.Session.commit()
+        return redirect_to(action='view')

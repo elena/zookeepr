@@ -83,7 +83,7 @@
         <p class="label"><b>Other special requirements:</b> ${ c.registration.special }</p>
 %endif
 
-          <p class="label"><label for="registration.prevlca"><b>Previous LCA attendance:</b></label></p>
+          <p class="label"><label for="registration.prevlca"><b>Previous ${ h.lca_info['event_generic_name'] } attendance:</b></label></p>
           <p class="entries">
 % for (year, desc) in h.lca_rego['past_confs']:
             <br>
@@ -110,9 +110,10 @@
 %if c.registration.planetfeed:
           <p class="label"><b>Planet Feed:</b> ${ c.registration.planetfeed }</p>
 %endif
+% if c.registration.silly_description:
           <p class="label"><label for="registration.silly_description"><b>Description:</b> ${ c.registration.silly_description }</p>
           <p class="note">This is a randomly chosen description for your name badge</p>
-
+% endif
           <h2>Subscriptions</h2>
 
           <p>${ h.yesno('linuxaustralia' in (c.registration.signup or [])) |n } I want to sign up for (free) Linux Australia membership!</p>

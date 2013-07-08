@@ -484,7 +484,10 @@ class RegistrationController(BaseController):
             defaults['registration.vcstext'] = c.registration.vcs
 
         form = render('/registration/edit.mako')
-        return htmlfill.render(form, defaults)
+        if c.form_errors:
+            return form
+        else:
+            return htmlfill.render(form, defaults)
 
     @validate(schema=edit_schema, form='edit', post_only=True, on_get=True, variable_decode=True)
     def _edit(self, id):
@@ -508,7 +511,7 @@ class RegistrationController(BaseController):
     def save_details(self, result):
         # Store Registration details
         for k in result['registration']:
-            if k in ('shell', 'editor', 'distro'):
+            if k in ('shell', 'editor', 'distro', 'vcs'):
                 if result['registration'][k] == 'other':
                     setattr(c.registration, k, result['registration'][k + 'text'])
                 else:
@@ -788,9 +791,6 @@ class RegistrationController(BaseController):
     @authorize(h.auth.has_organiser_role)
     def index(self):
         per_page = 20
-        #from zkpylons.model.core import tables as core_tables
-        #from zkpylons.model.registration import tables as registration_tables
-        #from zkpylons.model.proposal import tables as proposal_tables
         from webhelpers import paginate #Upgrade to new paginate
 
         filter = dict(request.GET)
@@ -848,6 +848,8 @@ class RegistrationController(BaseController):
                     registration_list.remove(registration)
                 elif filter.has_key('manual_invoice') and filter['manual_invoice'] == 'true' and not (True in [invoice.manual for invoice in registration.person.invoices]):
                     registration_list.remove(registration)
+                elif filter.has_key('not_australian') and filter['not_australian'] == 'true' and registration.person.country == "AUSTRALIA":
+                    registration_list.remove(registration)
                 elif len(filter['product']) > 0 and 'all' not in filter['product']:
                     # has to be done last as it is an OR not an AND
                     valid_invoices = []
@@ -902,6 +904,12 @@ class RegistrationController(BaseController):
                     invoices.append(str(invoice.id))
                     for item in invoice.items:
                         products.append(str(item.qty) + "x" + item.description)
+
+            # Hack to fix mising fields
+            if not registration.nick:
+                registration.nick = ''
+            if not registration.silly_description:
+                registration.silly_description = ''
 
             data.append([registration.id,
                          registration.person.firstname.encode('utf-8'),
@@ -1153,7 +1161,7 @@ class RegistrationController(BaseController):
                      c.profs[r.person.company] = {}
                 if r.person.lastname not in c.profs[r.person.company]:
                     c.profs[r.person.company][r.person.lastname] = []
-                c.profs[r.person.company][r.person.lastname].append(r.person.fullname())
+                c.profs[r.person.company][r.person.lastname].append(r.person.fullname)
 
         response.headers['Content-type']='text/plain; charset=utf-8'
         return render('/registration/professionals_latex.mako')
@@ -1167,6 +1175,6 @@ class RegistrationController(BaseController):
                      c.profs[r.person.company] = {}
                 if r.person.lastname not in c.profs[r.person.company]:
                     c.profs[r.person.company][r.person.lastname] = []
-                c.profs[r.person.company][r.person.lastname].append(r.person.fullname())
+                c.profs[r.person.company][r.person.lastname].append(r.person.fullname)
 
         response.headers['Content-type']='text/plain; charset=utf-8'

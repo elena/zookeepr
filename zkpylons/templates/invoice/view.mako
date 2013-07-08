@@ -27,6 +27,7 @@
 % elif c.invoice.is_paid:
 %   if h.auth.authorized(h.auth.has_organiser_role):
         <li>Invoice was paid by ${ c.invoice.person.email_address }.</li>
+        <li>${ h.link_to('Refund Invoice', url = h.url_for(action='refund')) }</li>
 %   else:
         <li>Invoice has been paid.</li>
 %   endif
@@ -36,6 +37,7 @@
 %   if h.auth.authorized(h.auth.has_organiser_role):
         <li>${ h.link_to('Pay this invoice manually', url = h.url_for(action='pay_manual')) }</li>
          <ul><li>Use this if the person has paid via direct credit to the bank account or similar</li></ul>
+        <li>${ h.link_to('Extend due date', h.url_for(action='extend')) }</li>
 %   endif
         <li>${ h.link_to('Pay this invoice', url = h.url_for(action='pay')) }</li>
 %   if c.invoice.person.registration:
