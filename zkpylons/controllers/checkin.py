@@ -33,9 +33,6 @@ class CheckinController(BaseController):
     def __before__(self, **kwargs):
         pass
 
-    def index(self):
-        return render('/checkin/index.mako')
-
     @jsonify
     def lookup(self):
         q = request.params['q']
@@ -45,17 +42,18 @@ class CheckinController(BaseController):
             Person.lastname.ilike(q + '%'),
             Person.fullname.ilike(q + '%'),
             Person.email_address.ilike(q + '%'),
+            Person.email_address.ilike('%@' + q + '%'),
         ))
 
-        personid_query = meta.Session.query(Person.id, cast(Person.id, sa.String).label("pretty")).filter(
+        personid_query = meta.Session.query(Person.id, sa.func.concat(cast(Person.id, sa.String), " - ", Person.fullname).label("pretty")).filter(
             cast(Person.id, sa.String).like(q + '%'),
         )
 
-        boarding_query = meta.Session.query(FulfilmentGroup.person_id, FulfilmentGroup.code.label("pretty")).filter( 
+        boarding_query = meta.Session.query(Person.id, sa.func.concat(FulfilmentGroup.code, " - ", Person.fullname).label("pretty")).join(FulfilmentGroup).filter(
             FulfilmentGroup.code.ilike(q + '%')
         )
 
-        badge_query = meta.Session.query(Fulfilment.person_id, Fulfilment.code.label("pretty")).filter( 
+        badge_query = meta.Session.query(Person.id, sa.func.concat(Fulfilment.code, " - ", Person.fullname).label("pretty")).join(Fulfilment).filter(
             Fulfilment.code.ilike(q + '%')
         )
 
@@ -96,11 +94,13 @@ class CheckinController(BaseController):
                   """ % id
 
         fulfilment_items_qry = """
-                       select fi.*, p.description
+                       select fi.*, CONCAT(c.name, ' - ', p.description) AS description
                        from fulfilment_item fi,
-                            product p
+                            product p,
+                            product_category c
                        where fulfilment_id = %d
                          and fi.product_id = p.id
+                         and p.category_id = c.id
                        """ 
 
         person_qry = sa.sql.text(person_qry_text)

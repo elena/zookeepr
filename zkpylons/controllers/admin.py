@@ -718,6 +718,57 @@ class AdminController(BaseController):
                )
             );
         """)
+    @authorize(h.auth.has_organiser_role)
+    def registered_bagdrop(self):
+        """ List of people and swag for bag drop
+        """
+        return sql_response("""
+            SELECT person_id, name, string_agg(CONCAT(qty, 'x ', description), E'\n') as items
+            FROM (
+                SELECT
+                    person.id as person_id, concat(person.firstname, ' ', person.lastname) as name,
+                    fulfilment_item.qty, product.description
+                FROM fulfilment
+               LEFT JOIN fulfilment_status
+                    ON fulfilment.status_id = fulfilment_status.id
+                LEFT JOIN person
+                    ON person.id = fulfilment.person_id
+                LEFT JOIN fulfilment_item
+                    ON fulfilment_item.fulfilment_id = fulfilment.id
+                LEFT JOIN product
+                    ON product.id = fulfilment_item.product_id
+                WHERE fulfilment_status.name LIKE '%bagdrop%'
+                ORDER BY person.id, product.category_id
+            ) as force_aggregation_to_be_ordered
+            GROUP BY person_id, name
+            ORDER BY person_id
+        """)
+
+    @authorize(h.auth.has_organiser_role)
+    def registered_prestuff(self):
+        """ List of people and swag for bag stuffing
+        """
+        return sql_response("""
+            SELECT person_id, name, string_agg(CONCAT(qty, 'x ', description), E'\n') as items
+            FROM (
+                SELECT
+                    person.id as person_id, concat(person.firstname, ' ', person.lastname) as name,
+                    fulfilment_item.qty, product.description
+                FROM fulfilment
+               LEFT JOIN fulfilment_status
+                    ON fulfilment.status_id = fulfilment_status.id
+                LEFT JOIN person
+                    ON person.id = fulfilment.person_id
+                LEFT JOIN fulfilment_item
+                    ON fulfilment_item.fulfilment_id = fulfilment.id
+                LEFT JOIN product
+                    ON product.id = fulfilment_item.product_id
+                WHERE fulfilment_status.name LIKE '%prestuff%'
+                ORDER BY person.id, product.category_id
+            ) as force_aggregation_to_be_ordered
+            GROUP BY person_id, name
+            ORDER BY person_id
+        """)
 
     @authorize(h.auth.has_organiser_role)
     def reconcile(self):
@@ -837,6 +888,60 @@ class AdminController(BaseController):
             p = r.person
             c.text += p.firstname + " " + p.lastname + " &lt;" + p.email_address + "&gt;\n"
             count += 1
+        c.text += "</textarea></p>"
+        c.text += "<p>Total addresses: " + str(count) + "</p>"
+
+        return render('admin/text.mako')
+
+    def volunteer_signup(self):
+        """ People who should be added to the volunteers mailing list" [Mailing Lists] """
+
+        c.text = """<p>People who should be added to the volunteers mailing list (whether or not they then went on to pay for
+        the conference).</p><p>Copy and paste the following into mailman</p>
+        <p><textarea cols="100" rows="25">"""
+
+        count = 0
+        for r in meta.Session.query(Registration).all():
+            if r.person.is_volunteer():
+                p = r.person
+                c.text += p.firstname + " " + p.lastname + " &lt;" + p.email_address + "&gt;\n"
+                count += 1
+        c.text += "</textarea></p>"
+        c.text += "<p>Total addresses: " + str(count) + "</p>"
+
+        return render('admin/text.mako')
+
+    def speaker_signup(self):
+        """ People who should be added to the speakers mailing list" [Mailing Lists] """
+
+        c.text = """<p>People who should be added to the speakers mailing list (whether or not they then went on to pay for
+        the conference).</p><p>Copy and paste the following into mailman</p>
+        <p><textarea cols="100" rows="25">"""
+
+        count = 0
+        for r in meta.Session.query(Registration).all():
+            if r.person.is_speaker():
+                p = r.person
+                c.text += p.firstname + " " + p.lastname + " &lt;" + p.email_address + "&gt;\n"
+                count += 1
+        c.text += "</textarea></p>"
+        c.text += "<p>Total addresses: " + str(count) + "</p>"
+
+        return render('admin/text.mako')
+
+    def miniconf_org_signup(self):
+        """ People who should be added to the miniconf organisers mailing list" [Mailing Lists] """
+
+        c.text = """<p>People who should be added to the miniconf organisers mailing list (whether or not they then went on to pay for
+        the conference).</p><p>Copy and paste the following into mailman</p>
+        <p><textarea cols="100" rows="25">"""
+
+        count = 0
+        for r in meta.Session.query(Registration).all():
+            if r.person.is_miniconf_org():
+                p = r.person
+                c.text += p.firstname + " " + p.lastname + " &lt;" + p.email_address + "&gt;\n"
+                count += 1
         c.text += "</textarea></p>"
         c.text += "<p>Total addresses: " + str(count) + "</p>"
 
@@ -1541,25 +1646,19 @@ class AdminController(BaseController):
     @authorize(h.auth.has_organiser_role)
     def av_norelease(self):
         """ A list of proposals without releases for video/slides [AV] """
-        talk_list = Proposal.find_all_accepted().filter(or_(Proposal.video_release==False, Proposal.slides_release==False)).order_by(Proposal.scheduled)
+        schedule_list = meta.Session.query(Schedule).join(Event).join(TimeSlot).join(Location).join(Proposal).filter(or_(Proposal.video_release==False, Proposal.slides_release==False)).order_by(TimeSlot.start_time)
 
         c.columns = ['Talk', 'Title', 'Who', 'When', 'Video?', 'Slides?']
         c.data = []
-        for t in talk_list:
-            c.data.append(['<a href="/programme/schedule/view_talk/%d">%d</a>' % (t.id, t.id),
-                           h.util.html_escape(t.title),
-                           '<br/>'.join([
-                                '<a href="/person/%d">%s</a> (<a href="mailto:%s">%s</a>)' % (
-                                    p.id,
-                                    h.util.html_escape(p.fullname),
-                                    h.util.html_escape(p.email_address),
-                                    h.util.html_escape(p.email_address)
-                                ) for p in t.people
-                           ]),
-                           h.util.html_escape(t.scheduled),
-                           h.util.html_escape(t.video_release),
-                           h.util.html_escape(t.slides_release),
-            ])
+        for s in schedule_list:
+            if s.event.proposal:
+                c.data.append([h.link_to(s.event.proposal.id, h.url_for(controller='schedule', action='view_talk', id=s.event.proposal.id)),
+                    h.util.html_escape(s.event.computed_title()),
+                    '<br/>'.join(['%s (%s)' % (h.link_to(p.fullname, h.url_for(controller='person', action='view', id=p.id)), h.link_to(p.email_address, url='mailto:' + p.email_address)) for p in s.event.proposal.people]),
+                    h.util.html_escape(s.time_slot.start_time),
+                    h.util.html_escape(s.event.proposal.video_release),
+                    h.util.html_escape(s.event.proposal.slides_release),
+                ])
         c.noescape = True
         return table_response()
 
@@ -1592,23 +1691,25 @@ class AdminController(BaseController):
     def random_delegates(self):
         """ Select 20 random (paid, non-volunteer, non-organiser, non-speaker, non-media) delegates for prize draws """
 
+        delegate_list = Registration.find_all()
+        random.shuffle(delegate_list)
         filtered_list = []
 
-        for r in Registration.find_all():
+        for r in delegate_list:
+            if len(filtered_list) >= 20:
+                continue
             p = r.person
-            if p.is_speaker() or p.is_volunteer():
+            if p.is_speaker() or p.is_miniconf_org() or p.is_volunteer():
                 continue
-            if len(filter(lambda r: r.name in ('core_team', 'miniconfsonly', 'press', 'team', 'organiser', 'miniconf'), p.roles)):
+            if self._random_delegates_excluded(p):
                 continue
-            if p.paid() and p.has_paid_ticket():
+            if p.has_paid_ticket():
                 filtered_list.append(r)
-
-        random.shuffle(filtered_list)
 
         c.columns = ['Who', 'From', 'Email', 'Shell', 'Nick', 'Twitter', 'Previous LCAs']
         c.data = []
         sn_twitter = SocialNetwork.find_by_name("Twitter")
-        for r in filtered_list[:20]:
+        for r in filtered_list:
             c.data.append([
                 "%s %s (%d)" % (r.person.firstname, r.person.lastname, r.person.id),
                 "%s, %s" % (r.person.city, r.person.country),
@@ -1619,6 +1720,13 @@ class AdminController(BaseController):
                 ','.join(r.prevlca or []),
             ])
         return table_response()
+
+    def _random_delegates_excluded(self, person):
+       for invoice in person.invoices:
+           for invoice_item in invoice.items:
+               if invoice_item.product and invoice_item.product.badge_text in ['Media', 'Miniconf Only', 'Miniconf Organiser', 'Organiser', 'Speaker', 'Volunteer']:
+                   return True
+       return False
 
     @authorize(h.auth.has_organiser_role)
     def _destroy_personal_information(self):
